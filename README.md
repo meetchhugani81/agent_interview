@@ -9,9 +9,8 @@ InterviewOS is an AI-powered technical candidate-screening platform. A recruiter
 - Role, domain, difficulty, focus-area, and question-count configuration.
 - Real-time voice interview using LiveKit.
 - One question is generated at a time, so the system does not pre-generate unused questions.
-- English/Hindi bilingual interview mode. A 10-question session randomly interleaves exactly 5 English and 5 Hindi (Devanagari) questions.
+- English-only voice interview questions and responses.
 - Push-to-talk candidate responses and a **Repeat question** action.
-- Gnani TTS/STT support for Indian-language speech and Hinglish recognition.
 - Per-question evaluation plus a final candidate screening report.
 - Responsive React UI with live interview states and report visualizations.
 
@@ -24,7 +23,8 @@ InterviewOS is an AI-powered technical candidate-screening platform. A recruiter
 | Voice transport | LiveKit |
 | Agent orchestration | LiveKit Agents |
 | LLM / evaluation | Groq |
-| Indian-language speech | Gnani Vachana (`timbre-v2.5`) |
+| Speech recognition | Groq STT |
+| Speech synthesis | Deepgram Aura 2 (`athena`, English) |
 
 ## Prerequisites
 
@@ -35,7 +35,6 @@ Install these before running the project:
 - Node.js 20+ and npm
 - A LiveKit project with a URL, API key, and API secret
 - A Groq API key
-- A Gnani API key for Hindi/Hinglish speech. Without it, the fallback voice is English only.
 
 ## 1. Clone and prepare the project
 
@@ -89,26 +88,7 @@ LIVEKIT_API_SECRET=your_livekit_api_secret
 
 GROQ_API_KEY=your_groq_api_key
 
-# Required for clear Hindi/Hinglish speech and recognition.
-GNANI_API_KEY=your_gnani_api_key
-
-# Supported male Gnani Timbre voice.
-GNANI_TTS_VOICE=Vikrant
-
-# `bilingual` mixes English and Hindi (Devanagari) questions.
-INTERVIEW_LANGUAGE_MODE=bilingual
 ```
-
-### Language modes
-
-| Value | Behavior |
-| --- | --- |
-| `bilingual` | Random English/Hindi question order. For 10 questions: exactly 5 English + 5 Hindi. |
-| `english` | English questions only. |
-| `hindi` | Hindi (Devanagari) questions only. |
-| `hinglish` | Roman Hindi + English questions. |
-
-For Hindi audio, keep `GNANI_TTS_VOICE=Vikrant` and restart the agent after changing `.env`.
 
 ## 3. Run the application
 
@@ -137,10 +117,10 @@ python -m app.interview.agent start
 Confirm this log appears before beginning an interview:
 
 ```text
-[VOICE] Using Gnani Indian-language STT/TTS (model=timbre-v2.5, voice=Vikrant, language=auto)
+[VOICE] Using English-only STT/TTS
 ```
 
-If it says the default TTS/STT is being used, check that `GNANI_API_KEY` is present in the root `.env` file and restart the agent.
+If it fails to initialize speech services, check that the LiveKit and Groq configuration is present in the root `.env` file and restart the agent.
 
 ### Terminal 3 — React frontend
 
@@ -188,10 +168,10 @@ Remove-Item -Recurse -Force .\venv
 .\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
 ```
 
-### Hindi voice is unclear or no voice plays
+### English voice is unclear or no voice plays
 
-- Ensure the agent terminal shows the Gnani startup log above.
-- Verify `GNANI_TTS_VOICE=Vikrant`; unsupported voice names cause TTS request failures.
+- Ensure the agent terminal shows the English-only STT/TTS startup log above.
+- Confirm the configured LiveKit and Groq credentials are valid, then restart the agent.
 - Stop the agent with `Ctrl + C`, then start it again after changing `.env`.
 - Start a **new** screening session after restarting the agent.
 

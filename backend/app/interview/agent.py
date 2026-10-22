@@ -3,17 +3,10 @@ import os
 import json
 import httpx
 import re
-import random
 
 from livekit import agents
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, llm, AgentStateChangedEvent
 from livekit.plugins import silero, groq
-try:
-    from livekit.plugins import gnani
-    _gnani_import_error = None
-except ImportError as exc:
-    gnani = None
-    _gnani_import_error = str(exc)
 from livekit.agents import inference
 
 from dotenv import load_dotenv
@@ -175,20 +168,6 @@ async def entrypoint(ctx: JobContext):
     topics_list = setup.get("topics", [])
     topics_str  = ", ".join(topics_list)
     groq_model  = os.getenv("GROQ_LLM_MODEL", "openai/gpt-oss-20b")
-    language_mode = os.getenv("INTERVIEW_LANGUAGE_MODE", "bilingual").strip().lower()
-    # This selects each question's language as it is generated after an answer.
-    # It does not generate all questions at once or consume extra tokens upfront.
-    english_questions = (MAX_INTERVIEW_QUESTIONS + 1) // 2
-    hindi_questions = MAX_INTERVIEW_QUESTIONS - english_questions
-    question_languages = ["english"] * english_questions + ["hindi"] * hindi_questions
-    if language_mode == "bilingual":
-        random.shuffle(question_languages)
-    elif language_mode == "hindi":
-        question_languages = ["hindi"] * MAX_INTERVIEW_QUESTIONS
-    elif language_mode == "hinglish":
-        question_languages = ["hinglish"] * MAX_INTERVIEW_QUESTIONS
-    else:
-        question_languages = ["english"] * MAX_INTERVIEW_QUESTIONS
 
     logger.info(
         "[INTERVIEW CONFIG] role=%s domain=%s difficulty=%s topics=%s",
@@ -289,13 +268,7 @@ async def entrypoint(ctx: JobContext):
         try:
             await send_question_started()
 
-            question_language = question_languages[current_q - 1]
-            language_instruction = {
-                "english": "Ask in clear professional English only.",
-                "hindi": "Ask in pure Hindi written in Devanagari script only. Keep unavoidable technical terms in English.",
-                "hinglish": "Ask in natural Hinglish written in Roman Hindi and English. Keep technical terms in English.",
-            }[question_language]
-            logger.info("[QUESTION LANGUAGE] question_number=%s language=%s", current_q, question_language)
+            language_instruction = "Ask and respond in clear professional English only."
 
             prompt = (
                 f"You are a technical interviewer.\n"
@@ -357,11 +330,7 @@ async def entrypoint(ctx: JobContext):
                 if not is_valid(question_text):
                     logger.warning("[VALIDATION FAILED TWICE] Using fallback.")
                     fallback_topic = topics_list[0] if topics_list else "your field"
-                    question_text = (
-                        f"क्या आप {fallback_topic} से संबंधित किसी मूल अवधारणा को समझा सकते हैं?"
-                        if question_language == "hindi"
-                        else f"Can you explain a core concept related to {fallback_topic}?"
-                    )
+                    question_text = f"Can you explain a core concept related to {fallback_topic}?"
 
             current_question_text = question_text
 
@@ -418,35 +387,14 @@ async def entrypoint(ctx: JobContext):
         f"FOCUS TOPICS: {topics_str}\n\n"
         "Ask exactly one focused technical question per turn. "
         "Never list multiple questions. Never evaluate or comment on answers. "
-        "Understand candidate answers in English, Hindi, and Hinglish."
+        "Understand and respond to candidate answers in English only. If the candidate uses another language, politely ask them in English to answer in English."
     )
 
     interviewer_agent = Agent(instructions=system_prompt)
 
-    use_gnani = bool(os.getenv("GNANI_API_KEY")) and gnani is not None
-    if use_gnani:
-        gnani_voice = os.getenv("GNANI_TTS_VOICE", "Vikrant")
-        logger.info(
-            "[VOICE] Using Gnani Indian-language STT/TTS (model=timbre-v2.5, voice=%s, language=auto)",
-            gnani_voice,
-        )
-        session_stt = gnani.STT(language="en-IN", preferred_language="hi-IN")
-        session_tts = gnani.TTS(
-            model="timbre-v2.5",
-            voice=gnani_voice,
-            language="auto",
-            sample_rate=16000,
-        )
-    else:
-        if os.getenv("GNANI_API_KEY") and gnani is None:
-            logger.error(
-                "[VOICE] GNANI_API_KEY is configured, but the Gnani plugin could not load: %s. "
-                "Hindi speech will fall back to the English-only voice.",
-                _gnani_import_error or "unknown import error",
-            )
-        logger.warning("[VOICE] Gnani is not configured; using the existing default STT/TTS")
-        session_stt = groq.STT()
-        session_tts = inference.TTS(model="deepgram/aura-2", voice="athena", language="en")
+    logger.info("[VOICE] Using English-only STT/TTS")
+    session_stt = groq.STT()
+    session_tts = inference.TTS(model="deepgram/aura-2", voice="athena", language="en")
 
     session = AgentSession(
         stt=session_stt,

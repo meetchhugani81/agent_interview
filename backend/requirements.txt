@@ -3,7 +3,6 @@ uvicorn
 livekit
 livekit-agents
 livekit-plugins-groq
-livekit-plugins-gnani
 livekit-plugins-silero
 python-dotenv
 pydantic
